@@ -1,0 +1,10 @@
+DualSenseHUB v1.0.12
+
+1. Para usar o programa, baixe DualSenseHUB.exe na pagina Releases.
+2. Execute uma vez. Ele se instala em LocalAppData e cria atalho no Menu Iniciar.
+3. Pressione PS para mostrar a bateria.
+4. Segure PS por 3 segundos para iniciar o desligamento em 10 segundos.
+5. Para remover, execute uninstall.cmd.
+
+Este pacote contem o codigo-fonte completo, a licenca MIT e os workflows de
+compilacao publica do GitHub.

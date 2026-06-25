@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.23.x"
+          cache: false
+
+      - name: Generate Windows resources
+        run: go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --manifest none --icon assets/DualSenseHUB.ico
+
+      - name: Vet and test
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Build and hash
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          go build -buildvcs=false -trimpath -ldflags "-H=windowsgui -s -w" -o dist\DualSenseHUB.exe .
+          $hash = (Get-FileHash dist\DualSenseHUB.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  DualSenseHUB.exe" | Set-Content -Encoding ascii -NoNewline dist\SHA256SUMS.txt
+          Copy-Item LICENSE dist\LICENSE.txt
+          Copy-Item README.md dist\README.md
+          Copy-Item uninstall.cmd dist\uninstall.cmd
+          Compress-Archive -Path dist\DualSenseHUB.exe,dist\SHA256SUMS.txt,dist\LICENSE.txt,dist\README.md,dist\uninstall.cmd -DestinationPath dist\DualSenseHUB-${{ github.ref_name }}-Windows-x64.zip -Force
+          Write-Host "SHA-256: $hash"
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "dist/DualSenseHUB.exe" `
+            "dist/SHA256SUMS.txt" `
+            "dist/DualSenseHUB-${{ github.ref_name }}-Windows-x64.zip" `
+            --title "DualSenseHUB ${{ github.ref_name }}" `
+            --generate-notes

@@ -1,0 +1,61 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.23.x"
+          cache: false
+
+      - name: Generate Windows resources
+        run: go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --manifest none --icon assets/DualSenseHUB.ico
+
+      - name: Format check
+        shell: pwsh
+        run: |
+          $files = gofmt -l .
+          if ($files) {
+            Write-Error "Arquivos sem gofmt:`n$files"
+          }
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build Windows GUI
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          go build -buildvcs=false -trimpath -ldflags "-H=windowsgui -s -w" -o dist\DualSenseHUB.exe .
+          $hash = (Get-FileHash dist\DualSenseHUB.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  DualSenseHUB.exe" | Set-Content -Encoding ascii -NoNewline dist\SHA256SUMS.txt
+          Write-Host "SHA-256: $hash"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DualSenseHUB-windows-x64
+          path: |
+            dist/DualSenseHUB.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
